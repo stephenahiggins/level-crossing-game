@@ -1,0 +1,22 @@
+# Ignore SQLite database
+level_crossings.sqlite
+
+# Ignore image storage
+storage/
+
+# Ignore node_modules
+node_modules/
+
+# Ignore logs
+*.log
+
+# Ignore OS/IDE files
+.DS_Store
+.env
+
+# Ignore output files
+level_crossings.csv
+level_crossings.jsonl
+
+# Ignore VSCode settings
+.vscode/
