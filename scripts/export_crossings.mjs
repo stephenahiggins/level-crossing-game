@@ -30,6 +30,7 @@ const resolvePath = (value, fallback) => (value ? path.resolve(process.cwd(), va
 
 const defaultDbPath = path.resolve(root, "scraper/level_crossings.sqlite");
 const dbPath = resolvePath(args.get("db"), defaultDbPath);
+console.log("Using database:", dbPath);
 const defaultImageRoot = path.resolve(root, "scraper/storage");
 const imageRoot = resolvePath(args.get("images"), defaultImageRoot);
 

@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { FlagButton } from '../components/FlagButton';
-import { FeedbackOverlay } from '../components/FeedbackOverlay';
-import { Timer } from '../components/Timer';
-import { CountryInput } from '../components/CountryInput';
-import { GameConfig } from '../lib/config';
-import { getCountryName } from '../lib/countries';
-import { getFlagBase64 } from '../lib/flags';
-import { hasCrossingsData, setCrossingsData } from '../lib/roundGenerator';
-import type { GameMode } from '../lib/types';
-import { Leaderboard } from '../components/Leaderboard';
-import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { FlagButton } from "../components/FlagButton";
+import { FeedbackOverlay } from "../components/FeedbackOverlay";
+import { Timer } from "../components/Timer";
+import { CountryInput } from "../components/CountryInput";
+import { GameConfig } from "../lib/config";
+import { getCountryName } from "../lib/countries";
+import { getFlagBase64 } from "../lib/flags";
+import { hasCrossingsData, setCrossingsData } from "../lib/roundGenerator";
+import type { GameMode } from "../lib/types";
+import { Leaderboard } from "../components/Leaderboard";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   nextRound,
   setFeedbackAcknowledged,
@@ -18,23 +18,21 @@ import {
   submitAnswer,
   tickTimer,
   resetGame,
-} from '../store/gameSlice';
-import { recordLocalScore } from '../store/leaderboardSlice';
-import { useGetCrossingsQuery, usePostScoreMutation } from '../store/api';
+} from "../store/gameSlice";
+import { recordLocalScore } from "../store/leaderboardSlice";
+import { useGetCrossingsQuery, usePostScoreMutation } from "../store/api";
 
-const MODE_VALUES: GameMode[] = ['easy', 'medium', 'hard'];
+const MODE_VALUES: GameMode[] = ["easy", "medium", "hard"];
 
 export function Game() {
   const { mode: modeParam } = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const mode = MODE_VALUES.includes(modeParam as GameMode)
-    ? (modeParam as GameMode)
-    : null;
+  const mode = MODE_VALUES.includes(modeParam as GameMode) ? (modeParam as GameMode) : null;
 
   useEffect(() => {
     if (!mode) {
-      navigate('/');
+      navigate("/");
     }
   }, [mode, navigate]);
 
@@ -55,11 +53,12 @@ export function Game() {
     }
     const ready = hasCrossingsData();
     setCrossingsReady(ready);
+    console.log("LOG ready:", { ready, crossingData });
     if (ready) {
       setCrossingsMessage(null);
     } else if (!crossingsLoading && !crossingsError) {
       setCrossingsMessage(
-        'No level crossing data found. Run "node scripts/export_crossings.mjs --target backend" after running the scraper to populate assets.',
+        'No level crossing data found. Run "node scripts/export_crossings.mjs --target backend" after running the scraper to populate assets.'
       );
     }
   }, [crossingData, crossingsLoading, crossingsError]);
@@ -67,7 +66,7 @@ export function Game() {
   useEffect(() => {
     if (crossingsError) {
       setCrossingsMessage(
-        'Unable to load level crossing images from the server. Check that the backend has exported the assets.',
+        "Unable to load level crossing images from the server. Check that the backend has exported the assets."
       );
       setCrossingsReady(hasCrossingsData());
     }
@@ -75,7 +74,7 @@ export function Game() {
 
   useEffect(() => {
     if (crossingsError && crossingsFetchError) {
-      console.error('Failed to load level crossings', crossingsFetchError);
+      console.error("Failed to load level crossings", crossingsFetchError);
     }
   }, [crossingsError, crossingsFetchError]);
 
@@ -114,13 +113,13 @@ export function Game() {
   const recordedRef = useRef(false);
 
   useEffect(() => {
-    if (status !== 'gameover') {
+    if (status !== "gameover") {
       setScoreSubmitted(false);
     }
   }, [status]);
 
   useEffect(() => {
-    if (status === 'playing') {
+    if (status === "playing") {
       const interval = window.setInterval(() => {
         dispatch(tickTimer());
       }, 1000);
@@ -130,10 +129,10 @@ export function Game() {
   }, [dispatch, status]);
 
   useEffect(() => {
-    if (status !== 'gameover') {
+    if (status !== "gameover") {
       recordedRef.current = false;
     }
-    if (status === 'gameover' && !recordedRef.current && activeMode) {
+    if (status === "gameover" && !recordedRef.current && activeMode) {
       const avgTime = correctCount > 0 ? totalCorrectTime / correctCount : 0;
       if (score > 0) {
         dispatch(
@@ -147,7 +146,7 @@ export function Game() {
               avgTimePerCorrect: avgTime,
               timestamp: new Date().toISOString(),
             },
-          }),
+          })
         );
       }
       recordedRef.current = true;
@@ -155,7 +154,7 @@ export function Game() {
   }, [activeMode, correctCount, dispatch, score, status, timer, totalCorrectTime]);
 
   const handleAnswer = (answerCode: string) => {
-    if (!round || status !== 'playing') return;
+    if (!round || status !== "playing") return;
     const now = Date.now();
     const started = roundStartedAt ?? now;
     const timeTaken = Math.max(0.5, (now - started) / 1000);
@@ -168,7 +167,7 @@ export function Game() {
 
   const handleFeedbackContinue = () => {
     if (!feedback) return;
-    if (feedback === 'try-again') {
+    if (feedback === "try-again") {
       dispatch(setFeedbackAcknowledged());
     } else {
       dispatch(nextRound());
@@ -189,13 +188,16 @@ export function Game() {
       }).unwrap();
       setScoreSubmitted(true);
     } catch (error) {
-      console.error('Failed to submit score', error);
+      console.error("Failed to submit score", error);
     }
   };
 
-  const backgroundImage = useMemo(() => round?.crossing.imagePath ?? '', [round?.crossing.imagePath]);
+  const backgroundImage = useMemo(
+    () => round?.crossing.imagePath ?? "",
+    [round?.crossing.imagePath]
+  );
 
-  const showGameOver = status === 'gameover';
+  const showGameOver = status === "gameover";
 
   if (!crossingsReady) {
     return (
@@ -204,9 +206,9 @@ export function Game() {
           <h2 className="text-3xl font-extrabold">Preparing level crossings…</h2>
           <p className="text-lg leading-relaxed">
             {crossingsLoading
-              ? 'Loading level crossing photos from the server.'
+              ? "Loading level crossing photos from the server."
               : crossingsMessage ??
-                'No level crossings are available yet. Export the assets and refresh this page.'}
+                "No level crossings are available yet. Export the assets and refresh this page."}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             {crossingsError && (
@@ -220,7 +222,7 @@ export function Game() {
             )}
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               className="bg-white/80 text-dark font-semibold px-5 py-2 rounded-full shadow-md hover:-translate-y-0.5 transition"
             >
               Home
@@ -261,8 +263,8 @@ export function Game() {
               </div>
             </div>
             <div className="flex-1 w-full">
-              {activeMode === 'hard' ? (
-                <CountryInput onSubmit={handleHardSubmit} disabled={status !== 'playing'} />
+              {activeMode === "hard" ? (
+                <CountryInput onSubmit={handleHardSubmit} disabled={status !== "playing"} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {round.options.map((option) => (
@@ -270,9 +272,9 @@ export function Game() {
                       key={option.code}
                       base64={getFlagBase64(option.code)}
                       label={getCountryName(option.code)}
-                      withLabel={activeMode === 'easy'}
+                      withLabel={activeMode === "easy"}
                       onClick={() => handleAnswer(option.code)}
-                      disabled={status !== 'playing'}
+                      disabled={status !== "playing"}
                     />
                   ))}
                 </div>
@@ -284,7 +286,9 @@ export function Game() {
         {showGameOver && (
           <div className="text-center py-12">
             <h2 className="text-4xl font-black mb-4">Time&apos;s up!</h2>
-            <p className="text-2xl mb-6">You scored {score} with {correctCount} correct crossings.</p>
+            <p className="text-2xl mb-6">
+              You scored {score} with {correctCount} correct crossings.
+            </p>
             <div className="flex flex-wrap gap-4 justify-center mb-6">
               <button
                 type="button"
@@ -295,7 +299,7 @@ export function Game() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
                 className="bg-white/80 text-dark font-bold px-6 py-3 rounded-full shadow-lg hover:-translate-y-1 transition"
               >
                 Home
@@ -308,20 +312,22 @@ export function Game() {
                   className="bg-primary text-white font-bold px-6 py-3 rounded-full shadow-lg hover:-translate-y-1 transition disabled:opacity-60"
                 >
                   {scoreSubmitted || submitted
-                    ? 'Score submitted!'
+                    ? "Score submitted!"
                     : posting
-                    ? 'Submitting…'
-                    : 'Submit to global leaderboard'}
+                    ? "Submitting…"
+                    : "Submit to global leaderboard"}
                 </button>
               )}
             </div>
-            {submitError && <div className="text-red-200">Could not submit score. Try again later.</div>}
+            {submitError && (
+              <div className="text-red-200">Could not submit score. Try again later.</div>
+            )}
           </div>
         )}
       </div>
 
       <div className="mt-8">
-        <Leaderboard mode={activeMode ?? 'easy'} />
+        <Leaderboard mode={activeMode ?? "easy"} />
       </div>
 
       <FeedbackOverlay feedback={feedback} onContinue={handleFeedbackContinue} />
