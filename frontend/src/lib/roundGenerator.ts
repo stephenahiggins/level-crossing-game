@@ -1,42 +1,36 @@
-import { GameConfig } from './config';
-import { allCountryOptions, getCountryName } from './countries';
-import type {
-  GameMode,
-  LevelCrossing,
-  LevelCrossingRecord,
-  RoundData,
-  RoundOption,
-} from './types';
+import { GameConfig } from "./config";
+import { allCountryOptions, getCountryName } from "./countries";
+import type { GameMode, LevelCrossing, LevelCrossingRecord, RoundData, RoundOption } from "./types";
 
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, "");
 
 const computeAssetBase = (): string => {
-  const override = (import.meta.env.VITE_ASSET_BASE_URL as string | undefined) ?? '';
+  const override = (import.meta.env.VITE_ASSET_BASE_URL as string | undefined) ?? "";
   if (override) {
     return trimTrailingSlash(override);
   }
   const apiUrl =
-    (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:4000/api';
-  if (!apiUrl) return '';
+    (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:4000/api";
+  if (!apiUrl) return "";
   try {
     const parsed = new URL(apiUrl);
-    const pathname = parsed.pathname.replace(/\/api\/?$/, '');
+    const pathname = parsed.pathname.replace(/\/api\/?$/, "");
     const base = trimTrailingSlash(`${parsed.origin}${pathname}`);
     return base || parsed.origin;
   } catch (error) {
-    return trimTrailingSlash(apiUrl.replace(/\/api\/?$/, ''));
+    return trimTrailingSlash(apiUrl.replace(/\/api\/?$/, ""));
   }
 };
 
 const assetBase = computeAssetBase();
 
 const resolveImagePath = (value: string): string => {
-  if (!value) return '';
-  const cleaned = value.replace(/\\/g, '/');
+  if (!value) return "";
+  const cleaned = value.replace(/\\/g, "/");
   if (/^https?:\/\//i.test(cleaned)) {
     return cleaned;
   }
-  const relative = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+  const relative = cleaned.startsWith("/") ? cleaned : `/${cleaned}`;
   if (!assetBase) {
     return relative;
   }
@@ -49,10 +43,10 @@ const toLevelCrossing = (record: LevelCrossingRecord): LevelCrossing | null => {
   if (!record) return null;
   const id = Number(record.id);
   if (!Number.isFinite(id)) return null;
-  const countryCode = String(record.country_code ?? record.countryCode ?? '')
+  const countryCode = String(record.country_code ?? record.countryCode ?? "")
     .trim()
     .toUpperCase();
-  const rawImage = String(record.image_path ?? record.imagePath ?? '').trim();
+  const rawImage = String(record.image_path ?? record.imagePath ?? record.url ?? "").trim();
   const imagePath = resolveImagePath(rawImage);
   if (!imagePath || !countryCode) {
     return null;
@@ -81,7 +75,7 @@ export const setCrossingsData = (records: LevelCrossingRecord[] | undefined | nu
 
 export const hasCrossingsData = (): boolean => crossings.some((item) => Boolean(item.imagePath));
 
-const shuffle = <T,>(items: T[]): T[] => {
+const shuffle = <T>(items: T[]): T[] => {
   const list = [...items];
   for (let i = list.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -93,7 +87,7 @@ const shuffle = <T,>(items: T[]): T[] => {
 const pickCrossing = (previousId?: number): LevelCrossing => {
   const available = crossings.filter((item) => item.imagePath);
   if (!available.length) {
-    throw new Error('No level crossings available. Populate the backend assets to continue.');
+    throw new Error("No level crossings available. Populate the backend assets to continue.");
   }
   let candidate: LevelCrossing = available[Math.floor(Math.random() * available.length)];
   if (previousId != null && available.length > 1) {
@@ -107,13 +101,11 @@ const pickCrossing = (previousId?: number): LevelCrossing => {
 };
 
 const buildOptions = (correctCode: string, mode: GameMode): RoundOption[] => {
-  if (mode === 'hard') {
+  if (mode === "hard") {
     return [];
   }
-  const desired = mode === 'easy' ? GameConfig.easyChoices : GameConfig.mediumChoices;
-  const pool = shuffle(
-    allCountryOptions.filter((option) => option.code !== correctCode),
-  );
+  const desired = mode === "easy" ? GameConfig.easyChoices : GameConfig.mediumChoices;
+  const pool = shuffle(allCountryOptions.filter((option) => option.code !== correctCode));
   const selected = pool.slice(0, Math.max(0, desired - 1));
   selected.push({ code: correctCode, name: getCountryName(correctCode) });
   return shuffle(selected);

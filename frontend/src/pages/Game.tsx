@@ -53,7 +53,7 @@ export function Game() {
     }
     const ready = hasCrossingsData();
     setCrossingsReady(ready);
-    console.log("LOG ready:", { ready, crossingData });
+    console.log("LOG ready:", { ready, crossingData, crossingsLoading, crossingsError });
     if (ready) {
       setCrossingsMessage(null);
     } else if (!crossingsLoading && !crossingsError) {

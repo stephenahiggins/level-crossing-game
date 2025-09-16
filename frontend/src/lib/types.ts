@@ -1,4 +1,4 @@
-export type GameMode = 'easy' | 'medium' | 'hard';
+export type GameMode = "easy" | "medium" | "hard";
 
 export interface LevelCrossing {
   id: number;
@@ -10,6 +10,7 @@ export interface LevelCrossingRecord {
   id: number;
   image_path?: string;
   imagePath?: string;
+  url?: string;
   country_code?: string;
   countryCode?: string;
 }
