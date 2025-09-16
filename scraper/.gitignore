@@ -1,8 +1,8 @@
 # Ignore SQLite database
-level_crossings.sqlite
+# level_crossings.sqlite
 
 # Ignore image storage
-# storage/
+storage/
 
 # Ignore node_modules
 node_modules/
