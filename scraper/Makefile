@@ -9,3 +9,7 @@ cleanup-storage:
 
 clean:
 	rm -rf storage level_crossings.sqlite
+
+init:
+	./run_scraper_pipeline.sh
+	cd .. && node scripts/export_crossings.mjs --target backend
