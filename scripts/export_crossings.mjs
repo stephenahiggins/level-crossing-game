@@ -1,21 +1,21 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, '..');
+const root = path.resolve(__dirname, "..");
 
 const parseArgs = () => {
   const parsed = new Map();
   for (let i = 2; i < process.argv.length; i += 1) {
     const token = process.argv[i];
-    if (!token.startsWith('--')) continue;
+    if (!token.startsWith("--")) continue;
     const key = token.slice(2);
     const next = process.argv[i + 1];
-    if (!next || next.startsWith('--')) {
-      parsed.set(key, 'true');
+    if (!next || next.startsWith("--")) {
+      parsed.set(key, "true");
     } else {
       parsed.set(key, next);
       i += 1;
@@ -26,55 +26,56 @@ const parseArgs = () => {
 
 const args = parseArgs();
 
-const resolvePath = (value, fallback) =>
-  value ? path.resolve(process.cwd(), value) : fallback;
+const resolvePath = (value, fallback) => (value ? path.resolve(process.cwd(), value) : fallback);
 
-const defaultDbPath = path.resolve(root, 'scraper/level_crossings.sqlite');
-const dbPath = resolvePath(args.get('db'), defaultDbPath);
-const defaultImageRoot = path.resolve(root, 'scraper/storage');
-const imageRoot = resolvePath(args.get('images'), defaultImageRoot);
+const defaultDbPath = path.resolve(root, "scraper/level_crossings.sqlite");
+const dbPath = resolvePath(args.get("db"), defaultDbPath);
+const defaultImageRoot = path.resolve(root, "scraper/storage");
+const imageRoot = resolvePath(args.get("images"), defaultImageRoot);
 
 const parseTargets = (value) =>
   value
-    .split(',')
+    .split(",")
     .map((part) => part.trim().toLowerCase())
     .filter(Boolean);
 
 const requestedTargets = new Set(
-  parseTargets(args.get('targets') ?? args.get('target') ?? 'backend'),
+  parseTargets(args.get("targets") ?? args.get("target") ?? "backend")
 );
 
-if (args.get('backend') === 'true') {
-  requestedTargets.add('backend');
+if (args.get("backend") === "true") {
+  requestedTargets.add("backend");
 }
-if (args.get('frontend') === 'true') {
-  requestedTargets.add('frontend');
+if (args.get("frontend") === "true") {
+  requestedTargets.add("frontend");
 }
 
 if (!requestedTargets.size) {
-  requestedTargets.add('backend');
+  requestedTargets.add("backend");
 }
 
 const targetConfigs = [];
 
-if (requestedTargets.has('backend')) {
+if (requestedTargets.has("backend")) {
   targetConfigs.push({
-    name: 'backend',
-    json: path.resolve(root, 'backend/data/level_crossings.json'),
-    images: path.resolve(root, 'backend/public/crossings'),
+    name: "backend",
+    json: path.resolve(root, "backend/data/level_crossings.json"),
+    images: path.resolve(root, "backend/public/crossings"),
   });
 }
 
-if (requestedTargets.has('frontend')) {
+if (requestedTargets.has("frontend")) {
   targetConfigs.push({
-    name: 'frontend',
-    json: path.resolve(root, 'frontend/src/assets/level_crossings.json'),
-    images: path.resolve(root, 'frontend/public/crossings'),
+    name: "frontend",
+    json: path.resolve(root, "frontend/src/assets/level_crossings.json"),
+    images: path.resolve(root, "frontend/public/crossings"),
   });
 }
 
 if (!targetConfigs.length) {
-  console.error('No valid export targets supplied. Use --target backend, --target frontend, or --target backend,frontend');
+  console.error(
+    "No valid export targets supplied. Use --target backend, --target frontend, or --target backend,frontend"
+  );
   process.exit(1);
 }
 
@@ -100,15 +101,18 @@ for (const target of targetConfigs) {
 const sanitizeRelativePath = (relativePath) => {
   const normalized = path
     .normalize(relativePath)
-    .replace(/^([.][.][/\\])+/, '')
-    .replace(/^storage[/\\]/i, '')
-    .replace(/^[/\\]+/, '');
-  if (!normalized) return '';
-  return normalized.split(/[\\/]+/).filter(Boolean).join('/');
+    .replace(/^([.][.][/\\])+/, "")
+    .replace(/^storage[/\\]/i, "")
+    .replace(/^[/\\]+/, "");
+  if (!normalized) return "";
+  return normalized
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .join("/");
 };
 
 const db = new Database(dbPath, { readonly: true });
-const rows = db.prepare('SELECT id, image_path, country_code FROM level_crossings').all();
+const rows = db.prepare("SELECT id, url, country_code FROM level_crossings").all();
 
 const exportMap = new Map();
 
@@ -119,8 +123,8 @@ for (const row of rows) {
     continue;
   }
 
-  const countryCode = String(row.country_code ?? row.countryCode ?? '').toUpperCase();
-  const rawImagePath = String(row.image_path ?? row.imagePath ?? '');
+  const countryCode = String(row.country_code ?? row.countryCode ?? "").toUpperCase();
+  const rawImagePath = String(row.url ?? row.url ?? "");
   const relativePath = sanitizeRelativePath(rawImagePath);
 
   if (!relativePath) {
@@ -161,7 +165,7 @@ for (const row of rows) {
 
   exportMap.set(id, {
     id,
-    image_path: `/crossings/${exportRelative}`,
+    url: `/crossings/${exportRelative}`,
     country_code: countryCode,
   });
 }
@@ -176,7 +180,7 @@ for (const target of targetConfigs) {
 console.log(
   `Copied assets for ${exportRows.length} crossings into: ${targetConfigs
     .map((target) => target.images)
-    .join(', ')}`,
+    .join(", ")}`
 );
 
 db.close();
