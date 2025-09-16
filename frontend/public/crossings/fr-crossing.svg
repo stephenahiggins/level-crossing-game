@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#4ecdc4" />
+  <rect y="250" width="600" height="150" fill="#2b2d42" />
+  <rect y="250" width="600" height="20" fill="#ffe66d" />
+  <g transform="translate(150,80)">
+    <rect x="-20" y="0" width="40" height="220" fill="#ffe66d" />
+    <rect x="-80" y="20" width="200" height="40" fill="#ff6b6b" transform="rotate(20)" />
+    <rect x="-80" y="20" width="200" height="40" fill="#1a535c" transform="rotate(-20)" />
+    <circle cx="0" cy="180" r="40" fill="#fff" stroke="#1a535c" stroke-width="10" />
+  </g>
+  <text x="50%" y="340" font-size="38" font-family="Nunito, Arial" text-anchor="middle" fill="#fff">Prochain train vite!</text>
+</svg>

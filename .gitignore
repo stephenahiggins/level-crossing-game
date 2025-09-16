@@ -15,3 +15,17 @@ node_modules
 .env
 /frontend/.env
 /backend/.env
+
+node_modules
+/dist
+/frontend/node_modules
+/frontend/dist
+/frontend/.vite
+/backend/node_modules
+/backend/dist
+/backend/db/level_crossings.db
+/backend/db/level_crossings.db-journal
+.DS_Store
+.env
+/frontend/.env
+/backend/.env

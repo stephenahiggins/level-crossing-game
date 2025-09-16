@@ -1,5 +1,5 @@
 # Ignore SQLite database
-level_crossings.sqlite
+# level_crossings.sqlite
 
 # Ignore image storage
 storage/
