@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#0b7285" />
+  <rect y="260" width="600" height="140" fill="#2d3436" />
+  <rect y="260" width="600" height="22" fill="#ffe66d" />
+  <g transform="translate(150,70)">
+    <rect x="-18" y="0" width="36" height="230" fill="#ffe66d" />
+    <rect x="-110" y="50" width="220" height="40" fill="#ff6b6b" transform="rotate(35)" />
+    <rect x="-110" y="50" width="220" height="40" fill="#ffe66d" transform="rotate(-35)" />
+    <circle cx="0" cy="190" r="38" fill="#fff" stroke="#ff6b6b" stroke-width="10" />
+  </g>
+  <text x="50%" y="340" font-size="34" font-family="Nunito, Arial" text-anchor="middle" fill="#fff">カンカン！気をつけて</text>
+</svg>

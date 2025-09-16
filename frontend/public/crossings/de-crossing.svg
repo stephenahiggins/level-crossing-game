@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#556270" />
+  <rect y="250" width="600" height="150" fill="#222" />
+  <rect y="250" width="600" height="18" fill="#ffe66d" />
+  <g transform="translate(300,90)">
+    <rect x="-16" y="0" width="32" height="220" fill="#c7f464" />
+    <rect x="-120" y="40" width="240" height="40" fill="#ff6b6b" transform="rotate(25)" />
+    <rect x="-120" y="40" width="240" height="40" fill="#ffe66d" transform="rotate(-25)" />
+    <circle cx="0" cy="190" r="42" fill="#fff" stroke="#c7f464" stroke-width="12" />
+  </g>
+  <text x="50%" y="340" font-size="36" font-family="Nunito, Arial" text-anchor="middle" fill="#fff">Achtung! Bahnübergang</text>
+</svg>

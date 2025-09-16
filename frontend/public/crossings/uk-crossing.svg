@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#87ceeb" />
+      <stop offset="100%" stop-color="#4ecdc4" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#sky)" />
+  <rect y="250" width="600" height="150" fill="#444" />
+  <rect y="250" width="600" height="20" fill="#ffe66d" />
+  <circle cx="120" cy="220" r="60" fill="#fff" stroke="#ff6b6b" stroke-width="15" />
+  <rect x="260" y="80" width="40" height="220" fill="#1a535c" />
+  <rect x="200" y="100" width="160" height="40" fill="#ff6b6b" transform="rotate(15 280 120)" />
+  <rect x="200" y="100" width="160" height="40" fill="#ffe66d" transform="rotate(-15 280 120)" />
+  <text x="50%" y="360" font-family="Nunito, Arial" font-size="40" text-anchor="middle" fill="#fff">Mind the gap!</text>
+</svg>
