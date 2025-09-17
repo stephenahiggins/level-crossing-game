@@ -342,7 +342,12 @@ export function Game() {
         <Leaderboard mode={activeMode ?? "easy"} />
       </div>
 
-      <FeedbackOverlay feedback={feedback} onContinue={handleFeedbackContinue} />
+      <FeedbackOverlay
+        feedback={feedback}
+        onContinue={handleFeedbackContinue}
+        correctAnswerCode={round?.correctCode}
+        correctAnswerName={round?.correctCode ? getCountryName(round.correctCode) : undefined}
+      />
     </div>
   );
 }

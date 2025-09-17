@@ -96,11 +96,35 @@ const cleanupSessions = () => {
 
 const pickCrossing = (data, lastCountries) => {
   if (!data.length) return null;
-  // Filter out crossings whose country_code is in the recent list
-  const excluded = new Set(lastCountries);
-  let candidates = data.filter((c) => !excluded.has(c.country_code));
-  // Fallback: if filtering removed everything, relax constraint
+
+  const lastCountry = lastCountries[lastCountries.length - 1];
+
+  // Primary exclusion: recent countries (up to RECENT_COUNTRY_LIMIT)
+  const excludedRecent = new Set(lastCountries);
+  let candidates = data.filter((c) => !excludedRecent.has(c.country_code));
+
+  // If that was too aggressive (nothing left), try a softer rule: ONLY avoid the immediate last country.
+  if (!candidates.length && lastCountry) {
+    const withoutLastOnly = data.filter((c) => c.country_code !== lastCountry);
+    if (withoutLastOnly.length) candidates = withoutLastOnly;
+  }
+
+  // Final fallback: if still empty (e.g., dataset has <= 1 distinct country), allow all.
   if (!candidates.length) candidates = data;
+
+  // Additional guard: ensure we don't pick the same country consecutively when >1 distinct country exists.
+  if (lastCountry) {
+    const distinctCountries = new Set(data.map((c) => c.country_code));
+    if (distinctCountries.size > 1) {
+      // If every candidate is the lastCountry (can happen if data is skewed), rebuild candidates excluding lastCountry if possible.
+      const allSameAsLast = candidates.every((c) => c.country_code === lastCountry);
+      if (allSameAsLast) {
+        const alt = data.filter((c) => c.country_code !== lastCountry);
+        if (alt.length) candidates = alt; // only replace if we actually have alternatives
+      }
+    }
+  }
+
   const picked = candidates[Math.floor(Math.random() * candidates.length)];
   return picked;
 };
