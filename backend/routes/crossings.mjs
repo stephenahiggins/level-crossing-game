@@ -3,36 +3,62 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Router } from "express";
 import crypto from "crypto";
+import Database from "better-sqlite3";
 
 const router = Router();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataPath = path.resolve(__dirname, "../data/level_crossings.json");
 
+// We now use the SQLite DB produced by the scraper. It was moved to backend/db/level_crossings_data.sqlite
+// Keep this separate from the auth/scores DB (level_crossings.db) to avoid
+// mixing scraped content with application tables. If desired later, they can be merged.
+const crossingsDbPath = path.resolve(__dirname, "../db/level_crossings_data.sqlite");
+let crossingsDb;
+try {
+  if (!fs.existsSync(crossingsDbPath)) {
+    console.warn(
+      `[crossings] SQLite file not found at ${crossingsDbPath}. Endpoints will return empty data.`
+    );
+  } else {
+    crossingsDb = new Database(crossingsDbPath, { readonly: true });
+  }
+} catch (e) {
+  console.error("Failed to open crossings SQLite DB", e);
+}
+
+// Simple in-memory cache of all crossings (ids + url + country_code) refreshed on file mtime change.
+// This keeps behavior similar to prior JSON hot-reload while relying on DB storage.
 let cached = { data: [], mtimeMs: 0 };
-let missingLogged = false;
-
 const loadCrossings = () => {
+  if (!crossingsDbPath || !crossingsDb) return [];
   try {
-    const stats = fs.statSync(dataPath);
+    const stats = fs.statSync(crossingsDbPath);
     if (stats.mtimeMs !== cached.mtimeMs) {
-      const raw = fs.readFileSync(dataPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      cached = {
-        data: Array.isArray(parsed) ? parsed : [],
-        mtimeMs: stats.mtimeMs,
-      };
-    }
-    missingLogged = false;
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      if (!missingLogged) {
-        console.warn(`Level crossings metadata not found at ${dataPath}`);
-        missingLogged = true;
+      const rawRows = crossingsDb
+        .prepare(
+          "SELECT id, url, country_code FROM level_crossings WHERE url IS NOT NULL AND country_code IS NOT NULL"
+        )
+        .all();
+      const rows = rawRows.map((r) => {
+        // The scraper stores file paths like 'storage/img_123.jpg'. We serve static files under '/crossings'.
+        // If url already looks like '/crossings/...', leave it; else rewrite 'storage/' prefix.
+        let rewritten = r.url;
+        if (rewritten.startsWith("storage/")) {
+          rewritten = "/crossings/" + rewritten.substring("storage/".length);
+        } else if (!rewritten.startsWith("/crossings/")) {
+          // Fallback: if it's just 'img_123.jpg' or some other relative path
+          const base = path.basename(rewritten);
+          rewritten = "/crossings/" + base;
+        }
+        return { id: r.id, url: rewritten, country_code: r.country_code };
+      });
+      cached = { data: rows, mtimeMs: stats.mtimeMs };
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[crossings] Reloaded ${rows.length} crossings from SQLite`);
       }
-    } else {
-      console.error("Failed to read level crossings metadata", error);
     }
+  } catch (e) {
+    console.error("Failed to load crossings from SQLite", e);
     cached = { data: [], mtimeMs: 0 };
   }
   return cached.data;
