@@ -94,44 +94,65 @@ const cleanupSessions = () => {
   }
 };
 
-const pickCrossing = (data, lastCountries) => {
+// New balanced picker: Prefer countries not yet seen this session; otherwise prefer least-used countries.
+// Still avoids picking the same country consecutively when alternatives exist.
+const pickCrossing = (data, session) => {
   if (!data.length) return null;
+
+  // Backwards compatibility: if session passed as an array (old usage) treat it as lastCountries only
+  const lastCountries = Array.isArray(session) ? session : session.lastCountries || [];
+  const countryCounts = Array.isArray(session) ? {} : (session.countryCounts ||= {});
 
   const lastCountry = lastCountries[lastCountries.length - 1];
 
-  // Primary exclusion: recent countries (up to RECENT_COUNTRY_LIMIT)
-  const excludedRecent = new Set(lastCountries);
-  let candidates = data.filter((c) => !excludedRecent.has(c.country_code));
-
-  // If that was too aggressive (nothing left), try a softer rule: ONLY avoid the immediate last country.
-  if (!candidates.length && lastCountry) {
-    const withoutLastOnly = data.filter((c) => c.country_code !== lastCountry);
-    if (withoutLastOnly.length) candidates = withoutLastOnly;
+  // Group crossings by country for efficient selection
+  const byCountry = new Map();
+  for (const c of data) {
+    if (!c.country_code) continue;
+    let arr = byCountry.get(c.country_code);
+    if (!arr) byCountry.set(c.country_code, (arr = []));
+    arr.push(c);
   }
 
-  // Final fallback: if still empty (e.g., dataset has <= 1 distinct country), allow all.
-  if (!candidates.length) candidates = data;
+  if (!byCountry.size) return null;
 
-  // Additional guard: ensure we don't pick the same country consecutively when >1 distinct country exists.
-  if (lastCountry) {
-    const distinctCountries = new Set(data.map((c) => c.country_code));
-    if (distinctCountries.size > 1) {
-      // If every candidate is the lastCountry (can happen if data is skewed), rebuild candidates excluding lastCountry if possible.
-      const allSameAsLast = candidates.every((c) => c.country_code === lastCountry);
-      if (allSameAsLast) {
-        const alt = data.filter((c) => c.country_code !== lastCountry);
-        if (alt.length) candidates = alt; // only replace if we actually have alternatives
-      }
+  const allCountries = Array.from(byCountry.keys());
+
+  // Tier 1: countries never seen in this session
+  const unseen = allCountries.filter((cc) => !(cc in countryCounts));
+  let candidateCountries;
+  if (unseen.length) {
+    candidateCountries = unseen;
+  } else {
+    // Tier 2: countries with the minimum usage count (balanced distribution)
+    let minCount = Infinity;
+    for (const cc of allCountries) {
+      const cnt = countryCounts[cc] || 0; // should always be >0 if not unseen, but be defensive
+      if (cnt < minCount) minCount = cnt;
     }
+    candidateCountries = allCountries.filter((cc) => (countryCounts[cc] || 0) === minCount);
   }
 
-  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  // Avoid immediate repeat when possible
+  if (lastCountry && candidateCountries.length > 1) {
+    const withoutLast = candidateCountries.filter((cc) => cc !== lastCountry);
+    if (withoutLast.length) candidateCountries = withoutLast;
+  }
+
+  // Fallback safety: if somehow empty (shouldn't happen), use all countries
+  if (!candidateCountries.length) candidateCountries = allCountries;
+
+  const pickedCountry = candidateCountries[Math.floor(Math.random() * candidateCountries.length)];
+  const crossingsForCountry = byCountry.get(pickedCountry);
+  const picked = crossingsForCountry[Math.floor(Math.random() * crossingsForCountry.length)];
   return picked;
 };
 
 const updateRecentCountries = (session, countryCode) => {
   if (!countryCode) return;
   session.lastCountries.push(countryCode);
+  session.countryCounts = session.countryCounts || {};
+  session.countryCounts[countryCode] = (session.countryCounts[countryCode] || 0) + 1;
   if (session.lastCountries.length > RECENT_COUNTRY_LIMIT) {
     session.lastCountries.splice(0, session.lastCountries.length - RECENT_COUNTRY_LIMIT);
   }
@@ -151,13 +172,15 @@ router.get("/session/:id/next", (req, res) => {
   const data = loadCrossings();
   const session = touchSession(req.params.id);
   if (!session) return res.status(404).json({ error: "Session not found" });
-  const crossing = pickCrossing(data, session.lastCountries);
+  const crossing = pickCrossing(data, session);
   if (!crossing) return res.status(404).json({ error: "No crossings available" });
   updateRecentCountries(session, crossing.country_code);
   res.json({
     crossing,
     recentCountries: session.lastCountries.slice(),
     recentLimit: RECENT_COUNTRY_LIMIT,
+    // Expose lightweight balance info (counts) for potential client-side debugging (omit in production if noisy)
+    countryCounts: process.env.NODE_ENV !== "production" ? session.countryCounts : undefined,
   });
 });
 
