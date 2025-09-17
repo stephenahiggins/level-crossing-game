@@ -235,6 +235,19 @@ export function Game() {
 
   return (
     <div className="relative">
+      {/* Sub-header with back button and timer */}
+      <div className="flex items-center gap-4 absolute top-4 left-4 z-20">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="bg-white/80 text-dark font-bold px-6 py-3 rounded-full shadow-lg hover:-translate-y-1 transition"
+        >
+          ← Back
+        </button>
+        <div className="ml-2">
+          <Timer seconds={Math.max(0, timer)} />
+        </div>
+      </div>
       {backgroundImage && (
         <div
           className="absolute inset-0 -z-10 bg-cover bg-center blur-sm opacity-70"
@@ -242,8 +255,7 @@ export function Game() {
         />
       )}
       <div className="bg-black/40 rounded-3xl p-4 md:p-8 text-white shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <Timer seconds={Math.max(0, timer)} />
+        <div className="flex flex-wrap items-center justify-end gap-4 mb-6">
           <div className="flex flex-wrap gap-3 text-lg font-semibold">
             <div className="bg-white/10 px-4 py-2 rounded-full">Score: {score}</div>
             <div className="bg-white/10 px-4 py-2 rounded-full">Correct: {correctCount}</div>

@@ -1,0 +1,130 @@
+# Level Crossings Backend
+
+## Overview
+This backend powers a geography quiz style game where players identify the country of a railway level crossing image. It exposes REST endpoints for:
+- Authentication (local + Google OAuth token exchange)
+- Fetching level crossing metadata & images
+- Managing lightweight in-memory gameplay sessions (timed mode)
+- Submitting and retrieving high scores
+
+The service is a Node.js / Express app with a SQLite (better-sqlite3) database. Images are served as static assets from `/crossings`.
+
+## Data Model (SQLite)
+Key tables (see `db/schema.sql`):
+- `users(id, email, password_hash, display_name, provider)`
+- `scores(id, user_id, mode, score, duration_seconds, correct_count, avg_time_per_correct, created_at)`
+
+`level_crossings.json` is a static JSON dataset (not stored in DB) containing:
+```json
+{
+  "id": 123,
+  "url": "/crossings/img_123.jpg",
+  "country_code": "DE"
+}
+```
+Images referenced by `url` live under `public/crossings` and are served at `GET /crossings/...`.
+
+## Authentication
+- `POST /api/auth/register` – email/password registration
+- `POST /api/auth/login` – login, returns JWT (`Authorization: Bearer <token>`)
+- `POST /api/auth/google/token` – exchanges Google ID token → local user + JWT
+- `GET /api/me` – current user (requires JWT)
+
+JWTs expire in 1h (see `routes/auth.mjs`).
+
+## Scores
+- `POST /api/scores` (auth required) body: `{ mode, score, duration, correctCount, avgTimePerCorrect }`
+- `GET /api/scores/top?mode=<easy|medium|hard>&limit=50`
+
+Ordering: highest score first; tie-breakers: lower avg time, earlier created timestamp.
+
+## Level Crossings
+- `GET /api/crossings` – full metadata array (id, url, country_code). The client typically doesn't download all images at once; it lazily loads the one it needs.
+
+## Timed Session Gameplay Logic
+To support a paced game (e.g. guess as many as possible within a time window), we added lightweight in-memory sessions with a *recent country exclusion* rule.
+
+### Session Endpoints
+1. `POST /api/crossings/session` → `{ sessionId, recentLimit }`
+2. `GET /api/crossings/session/:id/next` →
+```json
+{
+  "crossing": { "id": 42, "url": "/crossings/img_42.jpg", "country_code": "FR" },
+  "recentCountries": ["DE", "GB", "US"],
+  "recentLimit": 5
+}
+```
+3. `GET /api/crossings/session/:id/debug` (non-production only) – inspect state.
+
+### Recent Country Exclusion Rule
+When selecting the next crossing the server:
+1. Loads full crossing list (cached in-memory; auto-reloads when JSON file mtime changes).
+2. Looks at the session's `lastCountries` list (max length = `recentLimit` = 5).
+3. Filters out any crossings whose `country_code` appears in that list.
+4. If filtering removes every candidate (e.g. too few distinct countries), it relaxes the constraint and uses the full list to avoid stalling the game.
+5. Picks uniformly at random from remaining candidates.
+6. Appends the chosen crossing's `country_code` to the session's `lastCountries`, trimming the list to the last 5 entries.
+
+### Session Lifecycle & Expiry
+- Sessions are stored in-memory (`Map`), keyed by `sessionId` (UUID).
+- Each request updates `updatedAt`; idle sessions > 10 minutes are purged lazily on the next session-related request.
+- A server restart clears all sessions (stateless expectation on the client: just start a new session).
+
+### Why In-Memory?
+The constraint is transient (only relevant during active play) and doesn't need persistence, keeping DB load low and selection logic simple. If horizontal scaling is required later, a shared store (Redis) or embedding the recent list in a signed client token would be next steps.
+
+## Selection Algorithm Pseudocode
+```
+lastCountries = session.lastCountries  // queue of recent country codes (max 5)
+excluded = set(lastCountries)
+candidates = allCrossings.filter(c => !excluded.has(c.country_code))
+if candidates.length == 0:
+    candidates = allCrossings
+pick = randomChoice(candidates)
+append pick.country_code to lastCountries
+trim lastCountries to last 5
+return pick
+```
+
+## Scoring (Client Responsibility)
+The backend does not compute the score; it trusts the posted values (subject to future enhancement). A typical client scoring approach:
+- Award points for each correct guess (scaled by difficulty mode)
+- Track total duration and average time per correct guess
+- Post final stats at game end
+
+Potential hardening improvements (future): server-authoritative session start timestamp, per-guess verification, rate limiting.
+
+## Environment Variables
+- `PORT` (default 4000)
+- `JWT_SECRET` (required)
+- `CORS_ORIGIN` (comma-separated list) – defaults to `http://localhost:5173`
+- `GOOGLE_CLIENT_ID` (needed for Google auth route)
+- `DATABASE_PATH` (optional custom sqlite path)
+- `NODE_ENV` – controls debug session endpoint exposure
+
+## Running Locally
+```
+npm install
+npm run dev
+```
+Backend will listen on `http://localhost:4000` (unless `PORT` overridden).
+
+## Error Handling
+Generic 500 handler logs error and returns `{ error: "Internal server error" }`. Validation uses zod and returns 400 with details.
+
+## Adding More Constraints (Extensibility)
+The selection logic (`pickCrossing`) is isolated in `routes/crossings.mjs`. To add rules (e.g., avoid repeating the *same image* within N rounds, weight under-represented countries), extend that function and adjust what session state stores.
+
+## Security Notes
+- Passwords hashed with bcrypt (cost 10)
+- JWT secret must be strong/random
+- Google token verified via `google-auth-library`
+
+## Future Enhancements
+- Persist sessions (multi-instance scaling)
+- Rate limiting & abuse protection
+- Server-validated scoring events
+- Country distribution weighting to reduce bias toward dominant countries in dataset
+
+---
+Questions or issues: open an issue in the repository.
