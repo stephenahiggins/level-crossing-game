@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { FlagButton } from "../components/FlagButton";
 import { FeedbackOverlay } from "../components/FeedbackOverlay";
 import { Timer } from "../components/Timer";
@@ -53,7 +53,6 @@ export function Game() {
     }
     const ready = hasCrossingsData();
     setCrossingsReady(ready);
-    console.log("LOG ready:", { ready, crossingData, crossingsLoading, crossingsError });
     if (ready) {
       setCrossingsMessage(null);
     } else if (!crossingsLoading && !crossingsError) {
@@ -89,10 +88,6 @@ export function Game() {
     };
   }, [dispatch, mode, crossingsReady]);
 
-  if (!mode) {
-    return null;
-  }
-
   const {
     mode: activeMode,
     status,
@@ -107,16 +102,50 @@ export function Game() {
   } = useAppSelector((state) => state.game);
   const { user } = useAppSelector((state) => state.auth);
 
-  const [postScore, { isLoading: posting, isSuccess: submitted, isError: submitError }] =
+  const elapsedTime = useMemo(() => Math.max(0, GameConfig.gameSeconds - timer), [timer]);
+
+  const scorePayload = useMemo(() => {
+    if (!activeMode) return null;
+    const avgTime = correctCount > 0 ? totalCorrectTime / correctCount : 0;
+    return {
+      mode: activeMode,
+      score,
+      duration: Math.round(elapsedTime),
+      correctCount,
+      avgTimePerCorrect: Number(avgTime.toFixed(2)),
+    };
+  }, [activeMode, correctCount, elapsedTime, score, totalCorrectTime]);
+
+  const [postScore, { isLoading: posting, error: submitError, reset: resetPostScore }] =
     usePostScoreMutation();
-  const [scoreSubmitted, setScoreSubmitted] = useState(false);
-  const recordedRef = useRef(false);
+  const [scoreSubmission, setScoreSubmission] = useState<"idle" | "pending" | "success" | "error">(
+    "idle"
+  );
+  const hasRecordedScoreRef = useRef(false);
+
+  const submitScore = useCallback(async () => {
+    if (!scorePayload || scorePayload.score <= 0 || !user) {
+      return false;
+    }
+    try {
+      setScoreSubmission("pending");
+      await postScore(scorePayload).unwrap();
+      setScoreSubmission("success");
+      return true;
+    } catch (error) {
+      console.error("Failed to submit score", error);
+      setScoreSubmission("error");
+      return false;
+    }
+  }, [postScore, scorePayload, user]);
 
   useEffect(() => {
     if (status !== "gameover") {
-      setScoreSubmitted(false);
+      hasRecordedScoreRef.current = false;
+      setScoreSubmission("idle");
+      resetPostScore?.();
     }
-  }, [status]);
+  }, [resetPostScore, status]);
 
   useEffect(() => {
     if (status === "playing") {
@@ -129,29 +158,27 @@ export function Game() {
   }, [dispatch, status]);
 
   useEffect(() => {
-    if (status !== "gameover") {
-      recordedRef.current = false;
+    if (status !== "gameover" || !scorePayload || scorePayload.score <= 0 || hasRecordedScoreRef.current) {
+      return;
     }
-    if (status === "gameover" && !recordedRef.current && activeMode) {
-      const avgTime = correctCount > 0 ? totalCorrectTime / correctCount : 0;
-      if (score > 0) {
-        dispatch(
-          recordLocalScore({
-            mode: activeMode,
-            score: {
-              id: `${Date.now()}`,
-              score,
-              correctCount,
-              duration: GameConfig.gameSeconds - timer,
-              avgTimePerCorrect: avgTime,
-              timestamp: new Date().toISOString(),
-            },
-          })
-        );
-      }
-      recordedRef.current = true;
+    dispatch(
+      recordLocalScore({
+        mode: scorePayload.mode,
+        score: {
+          id: `${Date.now()}`,
+          score: scorePayload.score,
+          correctCount: scorePayload.correctCount,
+          duration: scorePayload.duration,
+          avgTimePerCorrect: scorePayload.avgTimePerCorrect,
+          timestamp: new Date().toISOString(),
+        },
+      })
+    );
+    hasRecordedScoreRef.current = true;
+    if (user) {
+      void submitScore();
     }
-  }, [activeMode, correctCount, dispatch, score, status, timer, totalCorrectTime]);
+  }, [dispatch, scorePayload, status, submitScore, user]);
 
   const handleAnswer = (answerCode: string) => {
     if (!round || status !== "playing") return;
@@ -159,10 +186,6 @@ export function Game() {
     const started = roundStartedAt ?? now;
     const timeTaken = Math.max(0.5, (now - started) / 1000);
     dispatch(submitAnswer({ answer: answerCode, timeTaken }));
-  };
-
-  const handleHardSubmit = (answerCode: string) => {
-    handleAnswer(answerCode);
   };
 
   const handleFeedbackContinue = () => {
@@ -174,23 +197,9 @@ export function Game() {
     }
   };
 
-  const submitGlobalScore = async () => {
-    if (!activeMode) return;
-    const duration = GameConfig.gameSeconds - timer;
-    const avgTime = correctCount > 0 ? totalCorrectTime / correctCount : 0;
-    try {
-      await postScore({
-        mode: activeMode,
-        score,
-        duration,
-        correctCount,
-        avgTimePerCorrect: Number(avgTime.toFixed(2)),
-      }).unwrap();
-      setScoreSubmitted(true);
-    } catch (error) {
-      console.error("Failed to submit score", error);
-    }
-  };
+  const handleManualSubmit = useCallback(() => {
+    void submitScore();
+  }, [submitScore]);
 
   const backgroundImage = useMemo(
     () => round?.crossing.imagePath ?? "",
@@ -198,6 +207,10 @@ export function Game() {
   );
 
   const showGameOver = status === "gameover";
+
+  if (!mode) {
+    return null;
+  }
 
   if (!crossingsReady) {
     return (
@@ -276,7 +289,7 @@ export function Game() {
             </div>
             <div className="flex-1 w-full">
               {activeMode === "hard" ? (
-                <CountryInput onSubmit={handleHardSubmit} disabled={status !== "playing"} />
+                <CountryInput onSubmit={handleAnswer} disabled={status !== "playing"} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {round.options.map((option) => (
@@ -319,20 +332,41 @@ export function Game() {
               {user && score > 0 && (
                 <button
                   type="button"
-                  disabled={posting || scoreSubmitted || submitted}
-                  onClick={submitGlobalScore}
+                  disabled={
+                    posting ||
+                    scoreSubmission === "pending" ||
+                    scoreSubmission === "success"
+                  }
+                  onClick={handleManualSubmit}
                   className="bg-primary text-white font-bold px-6 py-3 rounded-full shadow-lg hover:-translate-y-1 transition disabled:opacity-60"
                 >
-                  {scoreSubmitted || submitted
-                    ? "Score submitted!"
-                    : posting
+                  {scoreSubmission === "success"
+                    ? "Score saved!"
+                    : scoreSubmission === "pending" || posting
                     ? "Submitting…"
+                    : scoreSubmission === "error"
+                    ? "Try again"
                     : "Submit to global leaderboard"}
                 </button>
               )}
             </div>
-            {submitError && (
-              <div className="text-red-200">Could not submit score. Try again later.</div>
+            {!user && score > 0 && (
+              <p className="text-white/80">
+                <Link to="/login" className="underline font-semibold">
+                  Sign in or continue with Google
+                </Link>{' '}
+                to publish this score on the global leaderboard.
+              </p>
+            )}
+            {scoreSubmission === "success" && (
+              <div className="text-green-200 font-semibold mt-3">
+                Your score is on the global leaderboard!
+              </div>
+            )}
+            {(scoreSubmission === "error" || submitError) && (
+              <div className="text-red-200 mt-3">
+                Could not submit score. Check your connection and try again.
+              </div>
             )}
           </div>
         )}
@@ -347,6 +381,8 @@ export function Game() {
         onContinue={handleFeedbackContinue}
         correctAnswerCode={round?.correctCode}
         correctAnswerName={round?.correctCode ? getCountryName(round.correctCode) : undefined}
+        highlightLatitude={round?.crossing.latitude ?? null}
+        highlightLongitude={round?.crossing.longitude ?? null}
       />
     </div>
   );

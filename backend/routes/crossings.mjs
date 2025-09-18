@@ -29,6 +29,18 @@ try {
 // Simple in-memory cache of all crossings (ids + url + country_code) refreshed on file mtime change.
 // This keeps behavior similar to prior JSON hot-reload while relying on DB storage.
 let cached = { data: [], mtimeMs: 0 };
+const toPublicUrl = (rawUrl) => {
+  if (!rawUrl) return "";
+  let rewritten = rawUrl;
+  if (rewritten.startsWith("storage/")) {
+    rewritten = "/crossings/" + rewritten.substring("storage/".length);
+  } else if (!rewritten.startsWith("/crossings/")) {
+    const base = path.basename(rewritten);
+    rewritten = "/crossings/" + base;
+  }
+  return rewritten;
+};
+
 const loadCrossings = () => {
   if (!crossingsDbPath || !crossingsDb) return [];
   try {
@@ -36,22 +48,16 @@ const loadCrossings = () => {
     if (stats.mtimeMs !== cached.mtimeMs) {
       const rawRows = crossingsDb
         .prepare(
-          "SELECT id, url, country_code FROM level_crossings WHERE url IS NOT NULL AND country_code IS NOT NULL"
+          "SELECT id, url, country_code, latitude, longitude FROM level_crossings WHERE url IS NOT NULL AND country_code IS NOT NULL"
         )
         .all();
-      const rows = rawRows.map((r) => {
-        // The scraper stores file paths like 'storage/img_123.jpg'. We serve static files under '/crossings'.
-        // If url already looks like '/crossings/...', leave it; else rewrite 'storage/' prefix.
-        let rewritten = r.url;
-        if (rewritten.startsWith("storage/")) {
-          rewritten = "/crossings/" + rewritten.substring("storage/".length);
-        } else if (!rewritten.startsWith("/crossings/")) {
-          // Fallback: if it's just 'img_123.jpg' or some other relative path
-          const base = path.basename(rewritten);
-          rewritten = "/crossings/" + base;
-        }
-        return { id: r.id, url: rewritten, country_code: r.country_code };
-      });
+      const rows = rawRows.map((r) => ({
+        id: r.id,
+        url: toPublicUrl(r.url),
+        country_code: r.country_code,
+        latitude: typeof r.latitude === "number" ? r.latitude : null,
+        longitude: typeof r.longitude === "number" ? r.longitude : null,
+      }));
       cached = { data: rows, mtimeMs: stats.mtimeMs };
       if (process.env.NODE_ENV !== "production") {
         console.log(`[crossings] Reloaded ${rows.length} crossings from SQLite`);

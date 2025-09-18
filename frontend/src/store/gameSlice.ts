@@ -70,7 +70,7 @@ const gameSlice = createSlice({
       Object.assign(state, createInitialState());
       state.mode = action.payload.mode;
       state.status = 'playing';
-  const next = generateRound(state.mode, undefined, state.roundIndex);
+      const next = generateRound(state.mode, undefined, state.roundIndex);
       state.round = toActiveRound(next);
       state.previousCrossingId = next.crossing.id;
       state.roundStartedAt = Date.now();
@@ -128,10 +128,10 @@ const gameSlice = createSlice({
     nextRound: (state) => {
       if (!state.mode) return;
       if (state.timer <= 0) {
-  // Game already over; ensure feedback overlay is dismissed
-  state.status = 'gameover';
-  state.feedback = null;
-  return;
+        // Game already over; ensure feedback overlay is dismissed
+        state.status = 'gameover';
+        state.feedback = null;
+        return;
       }
       state.roundIndex += 1;
       const next = generateRound(

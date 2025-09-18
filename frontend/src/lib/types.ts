@@ -4,6 +4,8 @@ export interface LevelCrossing {
   id: number;
   imagePath: string;
   countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface LevelCrossingRecord {
@@ -13,6 +15,8 @@ export interface LevelCrossingRecord {
   url?: string;
   country_code?: string;
   countryCode?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
 export interface RoundOption {

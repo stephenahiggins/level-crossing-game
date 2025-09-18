@@ -4,6 +4,7 @@ import { Home } from './pages/Home';
 import { Game } from './pages/Game';
 import { Login } from './pages/Login';
 import { Leaderboard } from './components/Leaderboard';
+import { AccountMenu } from './components/AccountMenu';
 import { useAppDispatch } from './store/hooks';
 import { restoreFromStorage } from './store/leaderboardSlice';
 
@@ -25,11 +26,14 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary via-secondary to-dark text-white">
       <ScrollToTop />
-      <header className="py-4 px-6 flex items-center justify-between">
+      <header className="py-4 px-6 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-extrabold drop-shadow-lg">
           Where&apos;s This Level Crossing?
         </h1>
-        <Leaderboard compact />
+        <div className="flex items-center gap-4">
+          <Leaderboard compact />
+          <AccountMenu />
+        </div>
       </header>
       <main className="flex-1 px-4 pb-10">
         <Routes>

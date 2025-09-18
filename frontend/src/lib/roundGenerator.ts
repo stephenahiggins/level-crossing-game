@@ -44,6 +44,11 @@ let countryFrequency: Map<string, number> = new Map();
 let rankedCountries: string[] = [];// most common -> least common
 let rankIndex: Record<string, number> = {}; // countryCode -> rank (0 = most common)
 
+const toNumberOrNull = (value: unknown): number | null => {
+  const num = typeof value === "string" ? Number.parseFloat(value) : Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
 const toLevelCrossing = (record: LevelCrossingRecord): LevelCrossing | null => {
   if (!record) return null;
   const id = Number(record.id);
@@ -60,6 +65,8 @@ const toLevelCrossing = (record: LevelCrossingRecord): LevelCrossing | null => {
     id,
     imagePath,
     countryCode,
+    latitude: toNumberOrNull(record.latitude),
+    longitude: toNumberOrNull(record.longitude),
   };
 };
 

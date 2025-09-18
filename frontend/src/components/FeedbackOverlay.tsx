@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { speak } from "../lib/tts";
+import { CountryMapHighlight } from "./CountryMapHighlight";
 
 type FeedbackType = "correct" | "try-again" | "failed";
 
@@ -15,6 +16,8 @@ interface FeedbackOverlayProps {
   onContinue: () => void;
   correctAnswerCode?: string;
   correctAnswerName?: string; // optional human readable name if available
+  highlightLatitude?: number | null;
+  highlightLongitude?: number | null;
 }
 
 export function FeedbackOverlay({
@@ -22,6 +25,8 @@ export function FeedbackOverlay({
   onContinue,
   correctAnswerCode,
   correctAnswerName,
+  highlightLatitude,
+  highlightLongitude,
 }: FeedbackOverlayProps) {
   useEffect(() => {
     if (feedback) {
@@ -57,6 +62,14 @@ export function FeedbackOverlay({
               <p className="text-xl font-semibold mb-6">
                 Correct country: {correctAnswerName || correctAnswerCode}
               </p>
+            )}
+            {(feedback === "correct" || feedback === "failed") && (
+              <CountryMapHighlight
+                countryCode={correctAnswerCode}
+                latitude={highlightLatitude}
+                longitude={highlightLongitude}
+                outcome={feedback === "correct" ? "correct" : "failed"}
+              />
             )}
             <button
               type="button"
