@@ -94,58 +94,32 @@ const cleanupSessions = () => {
   }
 };
 
-// New balanced picker: Prefer countries not yet seen this session; otherwise prefer least-used countries.
-// Still avoids picking the same country consecutively when alternatives exist.
+// Strict picker: never repeat the same country consecutively if any alternative country exists.
 const pickCrossing = (data, session) => {
   if (!data.length) return null;
-
-  // Backwards compatibility: if session passed as an array (old usage) treat it as lastCountries only
   const lastCountries = Array.isArray(session) ? session : session.lastCountries || [];
-  const countryCounts = Array.isArray(session) ? {} : (session.countryCounts ||= {});
-
   const lastCountry = lastCountries[lastCountries.length - 1];
 
-  // Group crossings by country for efficient selection
+  // Group crossings by country
   const byCountry = new Map();
-  for (const c of data) {
-    if (!c.country_code) continue;
-    let arr = byCountry.get(c.country_code);
-    if (!arr) byCountry.set(c.country_code, (arr = []));
-    arr.push(c);
+  for (const row of data) {
+    if (!row.country_code) continue;
+    if (!byCountry.has(row.country_code)) byCountry.set(row.country_code, []);
+    byCountry.get(row.country_code).push(row);
   }
+  const countries = Array.from(byCountry.keys());
+  if (!countries.length) return null;
 
-  if (!byCountry.size) return null;
-
-  const allCountries = Array.from(byCountry.keys());
-
-  // Tier 1: countries never seen in this session
-  const unseen = allCountries.filter((cc) => !(cc in countryCounts));
-  let candidateCountries;
-  if (unseen.length) {
-    candidateCountries = unseen;
-  } else {
-    // Tier 2: countries with the minimum usage count (balanced distribution)
-    let minCount = Infinity;
-    for (const cc of allCountries) {
-      const cnt = countryCounts[cc] || 0; // should always be >0 if not unseen, but be defensive
-      if (cnt < minCount) minCount = cnt;
-    }
-    candidateCountries = allCountries.filter((cc) => (countryCounts[cc] || 0) === minCount);
+  // If only one distinct country, must allow repeat.
+  let candidateCountries = countries;
+  if (countries.length > 1 && lastCountry) {
+    const filtered = countries.filter((c) => c !== lastCountry);
+    if (filtered.length) candidateCountries = filtered;
   }
-
-  // Avoid immediate repeat when possible
-  if (lastCountry && candidateCountries.length > 1) {
-    const withoutLast = candidateCountries.filter((cc) => cc !== lastCountry);
-    if (withoutLast.length) candidateCountries = withoutLast;
-  }
-
-  // Fallback safety: if somehow empty (shouldn't happen), use all countries
-  if (!candidateCountries.length) candidateCountries = allCountries;
 
   const pickedCountry = candidateCountries[Math.floor(Math.random() * candidateCountries.length)];
-  const crossingsForCountry = byCountry.get(pickedCountry);
-  const picked = crossingsForCountry[Math.floor(Math.random() * crossingsForCountry.length)];
-  return picked;
+  const pool = byCountry.get(pickedCountry);
+  return pool[Math.floor(Math.random() * pool.length)];
 };
 
 const updateRecentCountries = (session, countryCode) => {
@@ -190,6 +164,29 @@ if (process.env.NODE_ENV !== "production") {
     const s = sessions.get(req.params.id);
     if (!s) return res.status(404).json({ error: "Session not found" });
     res.json({ lastCountries: s.lastCountries, updatedAt: s.updatedAt });
+  });
+
+  // Dev helper: simulate N picks to verify no immediate repeats.
+  router.get("/session/:id/simulate/:n", (req, res) => {
+    const n = Math.min(500, Math.max(1, parseInt(req.params.n, 10) || 0));
+    const data = loadCrossings();
+    const session = touchSession(req.params.id);
+    const picks = [];
+    let consecutiveRepeat = false;
+    for (let i = 0; i < n; i++) {
+      const crossing = pickCrossing(data, session);
+      if (!crossing) break;
+      if (
+        session.lastCountries[session.lastCountries.length - 1] === crossing.country_code &&
+        session.lastCountries.length
+      ) {
+        // (Should not happen unless only one country exists)
+        consecutiveRepeat = true;
+      }
+      updateRecentCountries(session, crossing.country_code);
+      picks.push(crossing.country_code);
+    }
+    res.json({ picks, consecutiveRepeat, uniqueCountries: [...new Set(picks)].length });
   });
 }
 

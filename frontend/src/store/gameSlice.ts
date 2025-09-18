@@ -26,6 +26,7 @@ interface GameState {
   outcomes: RoundOutcome[];
   previousCrossingId?: number;
   roundStartedAt: number | null;
+  roundIndex: number; // zero-based round counter for difficulty scaling
 }
 
 const createInitialState = (): GameState => ({
@@ -41,6 +42,7 @@ const createInitialState = (): GameState => ({
   outcomes: [],
   previousCrossingId: undefined,
   roundStartedAt: null,
+  roundIndex: 0,
 });
 
 const initialState: GameState = createInitialState();
@@ -68,7 +70,7 @@ const gameSlice = createSlice({
       Object.assign(state, createInitialState());
       state.mode = action.payload.mode;
       state.status = 'playing';
-      const next = generateRound(state.mode);
+  const next = generateRound(state.mode, undefined, state.roundIndex);
       state.round = toActiveRound(next);
       state.previousCrossingId = next.crossing.id;
       state.roundStartedAt = Date.now();
@@ -126,10 +128,17 @@ const gameSlice = createSlice({
     nextRound: (state) => {
       if (!state.mode) return;
       if (state.timer <= 0) {
-        state.status = 'gameover';
-        return;
+  // Game already over; ensure feedback overlay is dismissed
+  state.status = 'gameover';
+  state.feedback = null;
+  return;
       }
-      const next = generateRound(state.mode, state.round?.crossing.id ?? state.previousCrossingId);
+      state.roundIndex += 1;
+      const next = generateRound(
+        state.mode,
+        state.round?.crossing.id ?? state.previousCrossingId,
+        state.roundIndex
+      );
       state.round = toActiveRound(next);
       state.status = 'playing';
       state.feedback = null;
