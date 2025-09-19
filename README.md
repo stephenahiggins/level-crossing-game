@@ -29,7 +29,7 @@ Android.
    ```
 
 3. Start the backend:
-
+2
    ```bash
    npm run dev
    ```

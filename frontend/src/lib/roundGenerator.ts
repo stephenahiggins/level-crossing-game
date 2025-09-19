@@ -39,11 +39,6 @@ const resolveImagePath = (value: string): string => {
 
 let crossings: LevelCrossing[] = [];
 
-// Frequency + ranking data (computed whenever crossings are (re)loaded)
-let countryFrequency: Map<string, number> = new Map();
-let rankedCountries: string[] = [];// most common -> least common
-let rankIndex: Record<string, number> = {}; // countryCode -> rank (0 = most common)
-
 const toNumberOrNull = (value: unknown): number | null => {
   const num = typeof value === "string" ? Number.parseFloat(value) : Number(value);
   return Number.isFinite(num) ? num : null;
@@ -73,9 +68,6 @@ const toLevelCrossing = (record: LevelCrossingRecord): LevelCrossing | null => {
 export const setCrossingsData = (records: LevelCrossingRecord[] | undefined | null): void => {
   if (!Array.isArray(records)) {
     crossings = [];
-    countryFrequency = new Map();
-    rankedCountries = [];
-    rankIndex = {};
     return;
   }
   const unique = new Map<number, LevelCrossing>();
@@ -86,19 +78,6 @@ export const setCrossingsData = (records: LevelCrossingRecord[] | undefined | nu
     }
   }
   crossings = Array.from(unique.values());
-
-  // Build frequency map & rankings for difficulty scaling
-  countryFrequency = new Map();
-  for (const c of crossings) {
-    countryFrequency.set(c.countryCode, (countryFrequency.get(c.countryCode) ?? 0) + 1);
-  }
-  rankedCountries = Array.from(countryFrequency.entries())
-    .sort((a, b) => b[1] - a[1]) // most common first
-    .map(([code]) => code);
-  rankIndex = rankedCountries.reduce<Record<string, number>>((acc, code, idx) => {
-    acc[code] = idx;
-    return acc;
-  }, {});
 };
 
 export const hasCrossingsData = (): boolean => crossings.some((item) => Boolean(item.imagePath));
@@ -117,12 +96,7 @@ let lastCountryCode: string | null = null;
 // Strict client-side picker safeguard: avoid showing the same country twice consecutively
 // if there is any alternative country in the current dataset. Falls back gracefully when only
 // one country's crossings are available.
-/**
- * Picks a crossing with progressive difficulty.
- * Difficulty increases with roundIndex: earlier rounds bias toward common countries,
- * later rounds toward rare/obscure ones (based on frequency in the loaded dataset).
- */
-const pickCrossing = (previousId: number | undefined, roundIndex: number | undefined): LevelCrossing => {
+const pickCrossing = (previousId?: number): LevelCrossing => {
   const available = crossings.filter((item) => item.imagePath);
   if (!available.length) {
     throw new Error("No level crossings available. Populate the backend assets to continue.");
@@ -143,50 +117,7 @@ const pickCrossing = (previousId: number | undefined, roundIndex: number | undef
     if (withoutLastCountry.length) pool = withoutLastCountry;
   }
 
-  // If we have no ranking data (e.g. insufficient or not yet computed) fallback to uniform
-  if (!rankedCountries.length || pool.length <= 1 || roundIndex == null) {
-    const pickedSimple = pool[Math.floor(Math.random() * pool.length)];
-    lastCountryCode = pickedSimple.countryCode;
-    return pickedSimple;
-  }
-
-  // Progressive difficulty parameters
-  const maxProgressRounds = 12; // after ~12 rounds we've hit full difficulty (typical game length)
-  const p = Math.min(Math.max(roundIndex / (maxProgressRounds - 1), 0), 1); // 0..1
-  // alpha controls how strongly we bias toward rare countries (higher rank index)
-  const alphaStart = 0.15; // near-uniform at beginning
-  const alphaEnd = 3.2; // heavily skewed to rare at the end
-  const alpha = alphaStart + (alphaEnd - alphaStart) * p;
-
-  // Build weighted list from pool
-  let totalWeight = 0;
-  const weighted: { crossing: LevelCrossing; w: number }[] = [];
-  for (const c of pool) {
-    const rank = rankIndex[c.countryCode] ?? 0; // 0 common -> high index rare
-    // Weight grows with rank so rare items (higher rank) become more likely as alpha increases
-    const weight = Math.pow(rank + 1, alpha);
-    if (Number.isFinite(weight) && weight > 0) {
-      totalWeight += weight;
-      weighted.push({ crossing: c, w: weight });
-    }
-  }
-
-  if (!weighted.length || !Number.isFinite(totalWeight) || totalWeight <= 0) {
-    const fallback = pool[Math.floor(Math.random() * pool.length)];
-    lastCountryCode = fallback.countryCode;
-    return fallback;
-  }
-
-  let threshold = Math.random() * totalWeight;
-  for (const item of weighted) {
-    threshold -= item.w;
-    if (threshold <= 0) {
-      lastCountryCode = item.crossing.countryCode;
-      return item.crossing;
-    }
-  }
-  // Fallback (floating point edge case)
-  const picked = weighted[weighted.length - 1].crossing;
+  const picked = pool[Math.floor(Math.random() * pool.length)];
   lastCountryCode = picked.countryCode;
   return picked;
 };
@@ -202,8 +133,8 @@ const buildOptions = (correctCode: string, mode: GameMode): RoundOption[] => {
   return shuffle(selected);
 };
 
-export const generateRound = (mode: GameMode, previousId?: number, roundIndex?: number): RoundData => {
-  const crossing = pickCrossing(previousId, roundIndex);
+export const generateRound = (mode: GameMode, previousId?: number): RoundData => {
+  const crossing = pickCrossing(previousId);
   return {
     crossing,
     options: buildOptions(crossing.countryCode, mode),

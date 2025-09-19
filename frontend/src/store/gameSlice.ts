@@ -1,7 +1,7 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { GameConfig } from '../lib/config';
-import { generateRound } from '../lib/roundGenerator';
-import type { GameMode, RoundData, RoundOutcome } from '../lib/types';
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { GameConfig } from "../lib/config";
+import { generateRound } from "../lib/roundGenerator";
+import type { GameMode, RoundData, RoundOutcome } from "../lib/types";
 
 interface ActiveRound extends RoundData {
   attempts: number;
@@ -9,9 +9,9 @@ interface ActiveRound extends RoundData {
   lastAnswer?: string;
 }
 
-type GameStatus = 'idle' | 'playing' | 'feedback' | 'gameover';
+type GameStatus = "idle" | "playing" | "feedback" | "gameover";
 
-type FeedbackState = 'correct' | 'try-again' | 'failed' | null;
+type FeedbackState = "correct" | "try-again" | "failed" | null;
 
 interface GameState {
   mode: GameMode | null;
@@ -26,12 +26,11 @@ interface GameState {
   outcomes: RoundOutcome[];
   previousCrossingId?: number;
   roundStartedAt: number | null;
-  roundIndex: number; // zero-based round counter for difficulty scaling
 }
 
 const createInitialState = (): GameState => ({
   mode: null,
-  status: 'idle',
+  status: "idle",
   timer: GameConfig.gameSeconds,
   round: null,
   feedback: null,
@@ -42,7 +41,6 @@ const createInitialState = (): GameState => ({
   outcomes: [],
   previousCrossingId: undefined,
   roundStartedAt: null,
-  roundIndex: 0,
 });
 
 const initialState: GameState = createInitialState();
@@ -63,20 +61,20 @@ const toActiveRound = (round: RoundData): ActiveRound => ({
 });
 
 const gameSlice = createSlice({
-  name: 'game',
+  name: "game",
   initialState,
   reducers: {
     startGame: (state, action: PayloadAction<StartGamePayload>) => {
       Object.assign(state, createInitialState());
       state.mode = action.payload.mode;
-      state.status = 'playing';
-      const next = generateRound(state.mode, undefined, state.roundIndex);
+      state.status = "playing";
+      const next = generateRound(state.mode);
       state.round = toActiveRound(next);
       state.previousCrossingId = next.crossing.id;
       state.roundStartedAt = Date.now();
     },
     submitAnswer: (state, action: PayloadAction<SubmitAnswerPayload>) => {
-      if (!state.round || state.status !== 'playing') {
+      if (!state.round || state.status !== "playing") {
         return;
       }
       const { answer, timeTaken } = action.payload;
@@ -85,8 +83,8 @@ const gameSlice = createSlice({
       const isCorrect = answer === state.round.correctCode;
 
       if (isCorrect) {
-        state.feedback = 'correct';
-        state.status = 'feedback';
+        state.feedback = "correct";
+        state.status = "feedback";
         state.score += 1;
         state.correctCount += 1;
         state.totalCorrectTime += timeTaken;
@@ -101,14 +99,16 @@ const gameSlice = createSlice({
         state.roundStartedAt = null;
         state.timer = Math.max(0, state.timer - GameConfig.secondsPerTurn);
         if (state.timer <= 0) {
-          state.status = 'gameover';
+          state.status = "gameover";
+          // Ensure the game over screen is visible instead of a stale feedback overlay
+          state.feedback = null;
         }
       } else if (state.round.attempts < GameConfig.maxAttemptsPerRound) {
-        state.feedback = 'try-again';
-        state.status = 'feedback';
+        state.feedback = "try-again";
+        state.status = "feedback";
       } else {
-        state.feedback = 'failed';
-        state.status = 'feedback';
+        state.feedback = "failed";
+        state.status = "feedback";
         state.failedRounds += 1;
         state.outcomes.push({
           crossingId: state.round.crossing.id,
@@ -121,54 +121,52 @@ const gameSlice = createSlice({
         state.roundStartedAt = null;
         state.timer = Math.max(0, state.timer - GameConfig.secondsPerTurn);
         if (state.timer <= 0) {
-          state.status = 'gameover';
+          state.status = "gameover";
+          // Clear feedback so the player sees the game over / high score UI
+          state.feedback = null;
         }
       }
     },
     nextRound: (state) => {
       if (!state.mode) return;
       if (state.timer <= 0) {
-        // Game already over; ensure feedback overlay is dismissed
-        state.status = 'gameover';
-        state.feedback = null;
+        state.status = "gameover";
         return;
       }
-      state.roundIndex += 1;
-      const next = generateRound(
-        state.mode,
-        state.round?.crossing.id ?? state.previousCrossingId,
-        state.roundIndex
-      );
+      const next = generateRound(state.mode, state.round?.crossing.id ?? state.previousCrossingId);
       state.round = toActiveRound(next);
-      state.status = 'playing';
+      state.status = "playing";
       state.feedback = null;
       state.previousCrossingId = next.crossing.id;
       state.roundStartedAt = Date.now();
     },
     tickTimer: (state) => {
-      if (state.status !== 'playing') return;
+      if (state.status !== "playing") return;
       if (state.timer <= 0) {
-        state.status = 'gameover';
+        state.status = "gameover";
         return;
       }
       state.timer -= 1;
       if (state.timer <= 0) {
         state.timer = 0;
-        state.status = 'gameover';
+        state.status = "gameover";
       }
     },
     endGame: (state) => {
-      state.status = 'gameover';
+      state.status = "gameover";
       state.roundStartedAt = null;
     },
     resetGame: () => createInitialState(),
     setFeedbackAcknowledged: (state) => {
-      if (state.status === 'feedback') {
+      // Always clear feedback; if the game already ended, just reveal the gameover screen
+      if (state.feedback) {
         state.feedback = null;
+      }
+      if (state.status === "feedback") {
         if (state.timer <= 0) {
-          state.status = 'gameover';
+          state.status = "gameover";
         } else {
-          state.status = 'playing';
+          state.status = "playing";
         }
       }
     },
