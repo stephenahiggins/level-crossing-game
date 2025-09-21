@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FlagButton } from "../components/FlagButton";
+import { CountryMapHighlight } from "../components/CountryMapHighlight";
 import { FeedbackOverlay } from "../components/FeedbackOverlay";
 import { Timer } from "../components/Timer";
 import { CountryInput } from "../components/CountryInput";
@@ -20,6 +21,7 @@ import {
   resetGame,
 } from "../store/gameSlice";
 import { recordLocalScore } from "../store/leaderboardSlice";
+import { GAME_STATUS, FEEDBACK_STATE } from "../constants/gameStatus";
 import { useGetCrossingsQuery, usePostScoreMutation } from "../store/api";
 
 const MODE_VALUES: GameMode[] = ["easy", "medium", "hard"];
@@ -99,6 +101,7 @@ export function Game() {
     failedRounds,
     totalCorrectTime,
     roundStartedAt,
+    lastTimeoutAnswer,
   } = useAppSelector((state) => state.game);
   const { user } = useAppSelector((state) => state.auth);
 
@@ -140,7 +143,7 @@ export function Game() {
   }, [postScore, scorePayload, user]);
 
   useEffect(() => {
-    if (status !== "gameover") {
+    if (status !== GAME_STATUS.GAME_OVER) {
       hasRecordedScoreRef.current = false;
       setScoreSubmission("idle");
       resetPostScore?.();
@@ -148,7 +151,7 @@ export function Game() {
   }, [resetPostScore, status]);
 
   useEffect(() => {
-    if (status === "playing") {
+    if (status === GAME_STATUS.PLAYING) {
       const interval = window.setInterval(() => {
         dispatch(tickTimer());
       }, 1000);
@@ -158,7 +161,12 @@ export function Game() {
   }, [dispatch, status]);
 
   useEffect(() => {
-    if (status !== "gameover" || !scorePayload || scorePayload.score <= 0 || hasRecordedScoreRef.current) {
+    if (
+      status !== GAME_STATUS.GAME_OVER ||
+      !scorePayload ||
+      scorePayload.score <= 0 ||
+      hasRecordedScoreRef.current
+    ) {
       return;
     }
     dispatch(
@@ -181,7 +189,7 @@ export function Game() {
   }, [dispatch, scorePayload, status, submitScore, user]);
 
   const handleAnswer = (answerCode: string) => {
-    if (!round || status !== "playing") return;
+    if (!round || status !== GAME_STATUS.PLAYING) return;
     const now = Date.now();
     const started = roundStartedAt ?? now;
     const timeTaken = Math.max(0.5, (now - started) / 1000);
@@ -190,7 +198,7 @@ export function Game() {
 
   const handleFeedbackContinue = () => {
     if (!feedback) return;
-    if (feedback === "try-again") {
+    if (feedback === FEEDBACK_STATE.TRY_AGAIN) {
       dispatch(setFeedbackAcknowledged());
     } else {
       dispatch(nextRound());
@@ -206,7 +214,7 @@ export function Game() {
     [round?.crossing.imagePath]
   );
 
-  const showGameOver = status === "gameover";
+  const showGameOver = status === GAME_STATUS.GAME_OVER;
 
   if (!mode) {
     return null;
@@ -289,7 +297,7 @@ export function Game() {
             </div>
             <div className="flex-1 w-full">
               {activeMode === "hard" ? (
-                <CountryInput onSubmit={handleAnswer} disabled={status !== "playing"} />
+                <CountryInput onSubmit={handleAnswer} disabled={status !== GAME_STATUS.PLAYING} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {round.options.map((option) => (
@@ -299,7 +307,7 @@ export function Game() {
                       label={getCountryName(option.code)}
                       withLabel={activeMode === "easy"}
                       onClick={() => handleAnswer(option.code)}
-                      disabled={status !== "playing"}
+                      disabled={status !== GAME_STATUS.PLAYING}
                     />
                   ))}
                 </div>
@@ -311,9 +319,23 @@ export function Game() {
         {showGameOver && (
           <div className="text-center py-12">
             <h2 className="text-4xl font-black mb-4">Time&apos;s up!</h2>
-            <p className="text-2xl mb-6">
-              You scored {score} with {correctCount} correct crossings.
-            </p>
+            <p className="text-2xl mb-6">You scored {score} correct crossings.</p>
+            {lastTimeoutAnswer && (
+              <div className="mb-10 max-w-2xl mx-auto">
+                <div className="bg-white/5 rounded-3xl p-6 shadow-inner">
+                  <h3 className="text-2xl font-bold mb-4">Final crossing location</h3>
+                  <p className="mb-4 text-lg font-semibold">
+                    Country: {getCountryName(lastTimeoutAnswer.code)}
+                  </p>
+                  <CountryMapHighlight
+                    countryCode={lastTimeoutAnswer.code}
+                    latitude={lastTimeoutAnswer.latitude}
+                    longitude={lastTimeoutAnswer.longitude}
+                    outcome={FEEDBACK_STATE.FAILED}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 justify-center mb-6">
               <button
                 type="button"
@@ -333,9 +355,7 @@ export function Game() {
                 <button
                   type="button"
                   disabled={
-                    posting ||
-                    scoreSubmission === "pending" ||
-                    scoreSubmission === "success"
+                    posting || scoreSubmission === "pending" || scoreSubmission === "success"
                   }
                   onClick={handleManualSubmit}
                   className="bg-primary text-white font-bold px-6 py-3 rounded-full shadow-lg hover:-translate-y-1 transition disabled:opacity-60"
@@ -354,7 +374,7 @@ export function Game() {
               <p className="text-white/80">
                 <Link to="/login" className="underline font-semibold">
                   Sign in or continue with Google
-                </Link>{' '}
+                </Link>{" "}
                 to publish this score on the global leaderboard.
               </p>
             )}

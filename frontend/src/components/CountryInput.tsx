@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { GameConfig } from '../lib/config';
-import { findSuggestions, normalizeCountryInput } from '../lib/countries';
-import type { RoundOption } from '../lib/types';
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { GameConfig } from "../lib/config";
+import { findSuggestions, normalizeCountryInput } from "../lib/countries";
+import type { RoundOption } from "../lib/types";
 
 interface CountryInputProps {
   onSubmit: (code: string) => void;
@@ -24,39 +24,39 @@ export function CountryInput({ onSubmit, disabled = false }: CountryInputProps) 
     clearErrors,
     formState: { errors },
   } = useForm<FormValues>({
-    defaultValues: { country: '' },
+    defaultValues: { country: "" },
   });
 
   const [suggestions, setSuggestions] = useState<RoundOption[]>([]);
-  const countryValue = watch('country');
+  const countryValue = watch("country");
 
   useEffect(() => {
     if (!countryValue) {
-      setSuggestions(findSuggestions('', 5));
+      setSuggestions(findSuggestions("", 5));
     } else {
       setSuggestions(findSuggestions(countryValue, 5));
       if (countryValue.length >= GameConfig.hardMinLetters) {
-        clearErrors('country');
+        clearErrors("country");
       }
     }
   }, [countryValue, clearErrors]);
 
   const hint = useMemo(() => {
-    if (!countryValue) return 'Type the country name';
+    if (!countryValue) return "As you type, the country name will appear here.";
     if (countryValue.length < GameConfig.hardMinLetters) {
       return `Type at least ${GameConfig.hardMinLetters} letters`;
     }
-    return 'Tap a suggestion or press Enter';
+    return "Tap a suggestion or press Enter";
   }, [countryValue]);
 
   const onSubmitForm = (data: FormValues) => {
     if (!data.country) {
-      setError('country', { type: 'manual', message: 'Enter a country' });
+      setError("country", { type: "manual", message: "Enter a country" });
       return;
     }
     const normalized = normalizeCountryInput(data.country);
     if (!normalized) {
-      setError('country', { type: 'manual', message: 'Oops, try another name' });
+      setError("country", { type: "manual", message: "Oops, try another name" });
       return;
     }
     onSubmit(normalized);
@@ -64,7 +64,7 @@ export function CountryInput({ onSubmit, disabled = false }: CountryInputProps) 
   };
 
   const handleSuggestion = (option: RoundOption) => {
-    setValue('country', option.name, { shouldDirty: true, shouldTouch: true });
+    setValue("country", option.name, { shouldDirty: true, shouldTouch: true });
     const normalized = normalizeCountryInput(option.name);
     if (normalized) {
       onSubmit(normalized);
@@ -84,22 +84,24 @@ export function CountryInput({ onSubmit, disabled = false }: CountryInputProps) 
         className="w-full rounded-3xl px-6 py-4 text-2xl text-dark bg-white shadow focus:outline-none focus:ring-4 focus:ring-secondary"
         placeholder="Start typing..."
         disabled={disabled}
-        {...register('country')}
+        {...register("country")}
       />
       <div className="text-lg opacity-80">{hint}</div>
       {errors.country && <div className="text-red-200 text-lg">{errors.country.message}</div>}
       <div className="flex flex-wrap gap-3">
-        {suggestions.map((option) => (
-          <button
-            key={option.code}
-            type="button"
-            onClick={() => handleSuggestion(option)}
-            className="px-4 py-2 rounded-full bg-white/80 text-dark text-lg font-bold shadow hover:-translate-y-1 transition"
-            disabled={disabled}
-          >
-            {option.name}
-          </button>
-        ))}
+        {countryValue &&
+          countryValue.length > 0 &&
+          suggestions.map((option) => (
+            <button
+              key={option.code}
+              type="button"
+              onClick={() => handleSuggestion(option)}
+              className="px-4 py-2 rounded-full bg-white/80 text-dark text-lg font-bold shadow hover:-translate-y-1 transition"
+              disabled={disabled}
+            >
+              {option.name}
+            </button>
+          ))}
       </div>
       <button
         type="submit"

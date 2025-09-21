@@ -2,13 +2,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { speak } from "../lib/tts";
 import { CountryMapHighlight } from "./CountryMapHighlight";
+import { FEEDBACK_STATE } from "../constants/gameStatus";
 
-type FeedbackType = "correct" | "try-again" | "failed";
+type FeedbackType =
+  | typeof FEEDBACK_STATE.CORRECT
+  | typeof FEEDBACK_STATE.TRY_AGAIN
+  | typeof FEEDBACK_STATE.FAILED;
 
 const feedbackCopy: Record<FeedbackType, { title: string; emoji: string; color: string }> = {
-  correct: { title: "Well done!", emoji: "👍", color: "bg-green-500/90" },
-  "try-again": { title: "Try again!", emoji: "🙂", color: "bg-yellow-500/90" },
-  failed: { title: "Next time!", emoji: "💡", color: "bg-red-500/90" },
+  [FEEDBACK_STATE.CORRECT]: { title: "Well done!", emoji: "👍", color: "bg-green-500/90" },
+  [FEEDBACK_STATE.TRY_AGAIN]: { title: "Try again!", emoji: "🙂", color: "bg-yellow-500/90" },
+  [FEEDBACK_STATE.FAILED]: { title: "Next time!", emoji: "💡", color: "bg-red-500/90" },
 };
 
 interface FeedbackOverlayProps {
@@ -31,7 +35,7 @@ export function FeedbackOverlay({
   useEffect(() => {
     if (feedback) {
       let base = feedbackCopy[feedback].title;
-      if (feedback === "failed" && (correctAnswerName || correctAnswerCode)) {
+      if (feedback === FEEDBACK_STATE.FAILED && (correctAnswerName || correctAnswerCode)) {
         const answerText = correctAnswerName ?? correctAnswerCode;
         base = `${base} It was ${answerText}.`;
       }
@@ -58,25 +62,29 @@ export function FeedbackOverlay({
           >
             <div className="text-6xl drop-shadow-xl mb-4">{feedbackCopy[feedback].emoji}</div>
             <h2 className="text-3xl font-extrabold mb-4">{feedbackCopy[feedback].title}</h2>
-            {feedback === "failed" && (correctAnswerName || correctAnswerCode) && (
+            {feedback === FEEDBACK_STATE.FAILED && (correctAnswerName || correctAnswerCode) && (
               <p className="text-xl font-semibold mb-6">
                 Correct country: {correctAnswerName || correctAnswerCode}
               </p>
             )}
-            {(feedback === "correct" || feedback === "failed") && (
+            {(feedback === FEEDBACK_STATE.CORRECT || feedback === FEEDBACK_STATE.FAILED) && (
               <CountryMapHighlight
                 countryCode={correctAnswerCode}
                 latitude={highlightLatitude}
                 longitude={highlightLongitude}
-                outcome={feedback === "correct" ? "correct" : "failed"}
+                outcome={
+                  feedback === FEEDBACK_STATE.CORRECT
+                    ? FEEDBACK_STATE.CORRECT
+                    : FEEDBACK_STATE.FAILED
+                }
               />
             )}
             <button
               type="button"
               onClick={onContinue}
-              className="bg-white text-dark font-bold text-xl px-6 py-3 rounded-full shadow-lg hover:shadow-2xl transition-transform hover:-translate-y-1"
+              className="bg-white text-dark font-bold text-xl px-6 py-3 mt-2 rounded-full shadow-lg hover:shadow-2xl transition-transform hover:-translate-y-1"
             >
-              {feedback === "try-again" ? "Give it another go" : "Next crossing"}
+              {feedback === FEEDBACK_STATE.TRY_AGAIN ? "Give it another go" : "Next crossing"}
             </button>
           </motion.div>
         </motion.div>
